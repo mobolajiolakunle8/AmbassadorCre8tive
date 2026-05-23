@@ -100,7 +100,6 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
 
           <div className="mt-6 pt-6 border-t border-white/10">
             <p className="text-xs text-white/40 text-center">
-              Demo credentials: admin@ambassadorcre8tive.com / admin123
             </p>
           </div>
         </div>
