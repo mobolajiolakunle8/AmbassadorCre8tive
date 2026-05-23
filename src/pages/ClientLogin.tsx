@@ -123,7 +123,6 @@ export default function ClientLogin({ onLogin }: ClientLoginProps) {
 
           <div className="mt-6 pt-6 border-t border-white/10">
             <p className="text-xs text-white/40 text-center">
-              Demo credentials: client@demo.com / client123
             </p>
           </div>
         </motion.div>
