@@ -16,20 +16,12 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
     setLoading(true);
     setError("");
 
-    // Try Firebase Auth first, fall back to demo credentials
     const result = await adminLogin(email, password);
     if (result.success) {
       onLogin();
       window.location.hash = "#/admin";
     } else {
-      // Firebase not configured? Allow demo login
-      if (email === "admin@ambassadorcre8tive.com" && password === "admin123") {
-        localStorage.setItem("adminLoggedIn", "true");
-        onLogin();
-        window.location.hash = "#/admin";
-      } else {
-        setError("Invalid credentials. Check your email and password.");
-      }
+      setError("Invalid credentials. Check your email and password.");
     }
     setLoading(false);
   };
@@ -100,6 +92,7 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
 
           <div className="mt-6 pt-6 border-t border-white/10">
             <p className="text-xs text-white/40 text-center">
+              Authorized personnel only
             </p>
           </div>
         </div>

@@ -21,8 +21,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === "undefined") return "light";
     const saved = localStorage.getItem("theme") as Theme;
-    if (saved) return saved;
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    return saved || "light";
   });
 
   useEffect(() => {
@@ -59,7 +58,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
  * Premium animated theme toggle
  * Sun ↔ Moon with morphing animation, orbital particles, and spring physics
  */
-export function ThemeToggle({ className = "" }: { className?: string }) {
+export function ThemeToggle() {
   const { toggleTheme, isDark } = useTheme();
 
   return (
@@ -71,7 +70,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
         isDark
           ? "bg-white/10 border border-white/10 text-amber-300 hover:bg-white/15"
           : "bg-[#5E0B1D]/5 border border-[#5E0B1D]/10 text-[#5E0B1D] hover:bg-[#5E0B1D]/10"
-      } ${className}`}
+      }`}
       aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
       title={`${isDark ? "Light" : "Dark"} mode`}
     >
@@ -263,6 +262,21 @@ export function ThemeStyles() {
         background: #3a3045;
       }
 
+      .themed-scrollbar::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      .themed-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .themed-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(94, 11, 29, 0.1);
+        border-radius: 10px;
+      }
+      .themed-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(94, 11, 29, 0.2);
+      }
+
       /* ══════════════════════════════════════════════
          COMPREHENSIVE DARK MODE OVERRIDES
          Targets all hardcoded Tailwind classes
@@ -328,6 +342,21 @@ export function ThemeStyles() {
       }
 
       /* Form inputs */
+      input, textarea, select {
+        color: var(--text) !important; /* Adapt to theme */
+        background-color: var(--bg-card) !important;
+        border: 1px solid var(--border-strong) !important;
+        caret-color: var(--brand) !important;
+      }
+      /* Ensure visibility while typing */
+      input:focus, textarea:focus {
+        background-color: var(--bg-card) !important;
+        color: var(--text) !important;
+        outline: none !important;
+        border-color: var(--brand) !important;
+        box-shadow: 0 0 0 2px var(--brand-ring) !important;
+      }
+
       [data-theme="dark"] input,
       [data-theme="dark"] textarea,
       [data-theme="dark"] select {

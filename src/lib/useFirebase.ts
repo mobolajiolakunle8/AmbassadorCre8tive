@@ -28,6 +28,7 @@ import {
   onSiteContentChange,
   onProjectsChange,
   seedInitialData,
+  uploadImage,
   type SiteContent,
   type Service,
   type Project,
@@ -35,6 +36,12 @@ import {
   type Client,
   type Lead,
 } from "./firebase";
+
+interface BlogPost {
+  id: string; title: string; excerpt: string;
+  content: string; image: string; date: string; published: boolean;
+  template?: "standard" | "modern" | "minimal";
+}
 
 // ─── Firebase availability is detected via try/catch on first connection ─────
 
@@ -50,7 +57,11 @@ const defaultContent: SiteContent = {
     title: "Why Businesses Choose Ambassador Cre8tive",
     content: "We help businesses establish a strong online presence with premium website design, modern user experience, mobile responsiveness, SEO optimization, and conversion-focused layouts.",
   },
-  contact: { email: "ambassadorcre8tive@gmail.com", phone: "+2349030192034" },
+  contact: { email: "ambassadorcre8tive@gmail.com", phone: "+2349030192034", location: "Ibadan, Nigeria" },
+  social: { instagram: "", twitter: "", linkedin: "", facebook: "", tiktok: "" },
+  logo: "/logo.png",
+  name: "Ambassador Cre8tive",
+  tagline: "Premium Web Agency",
 };
 
 const defaultServices: Service[] = [
@@ -198,9 +209,50 @@ export function useAdminData() {
     ls.get("clients", [])
   );
   const [leads, setLeadsState] = useState<Lead[]>([]);
-  const [saving, setSaving] = useState(false);
+  const [blogs, setBlogsState] = useState<BlogPost[]>(
+    ls.get("blogs", [
+      { id: "1", title: "5 Web Design Trends That Will Dominate 2026", excerpt: "Discover the latest design trends shaping the future of web development.", content: "", image: "https://images.pexels.com/photos/1181449/pexels-photo-1181449.jpeg?auto=compress&cs=tinysrgb&w=800", date: "2026-01-15", published: true },
+      { id: "2", title: "Why Your Business Needs a Premium Website", excerpt: "Learn how premium web design can transform your business.", content: "", image: "https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&cs=tinysrgb&w=800", date: "2026-01-10", published: true },
+    ])
+  );
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [firebaseReady, setFirebaseReady] = useState(false);
+
+  // ── Auto-Save Effect ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setSaveStatus("saving");
+      
+      // 1. Save to LocalStorage (Instant)
+      ls.set("siteContent", siteContent);
+      ls.set("services", services);
+      ls.set("projects", projects);
+      ls.set("testimonials", testimonials);
+      ls.set("clients", clients);
+      ls.set("blogs", blogs);
+
+      // 2. Save to Firebase (Background)
+      if (firebaseReady) {
+        Promise.all([
+          updateSiteContent(siteContent),
+          ...services.map(s => updateService(s)),
+          ...projects.map(p => saveProject(p)),
+          ...testimonials.map(t => saveTestimonial(t)),
+          ...clients.map(c => saveClient(c)),
+        ]).then(() => {
+          setSaveStatus("saved");
+          setTimeout(() => setSaveStatus("idle"), 2000);
+        }).catch(() => {
+          setSaveStatus("error");
+        });
+      } else {
+        setSaveStatus("saved");
+        setTimeout(() => setSaveStatus("idle"), 2000);
+      }
+    }, 1000); // 1 second debounce after typing stops
+
+    return () => clearTimeout(timeoutId);
+  }, [siteContent, services, projects, testimonials, clients, blogs, firebaseReady]);
 
   useEffect(() => {
     async function loadAll() {
@@ -228,46 +280,7 @@ export function useAdminData() {
     loadAll();
   }, []);
 
-  const showStatus = (status: "saved" | "error") => {
-    setSaveStatus(status);
-    setTimeout(() => setSaveStatus("idle"), 3000);
-  };
 
-  // ── Save all ─────────────────────────────────────────────────────────────
-  const saveAll = useCallback(async () => {
-    setSaving(true);
-    setSaveStatus("saving");
-    try {
-      if (firebaseReady) {
-        // Save to Firebase
-        await Promise.all([
-          updateSiteContent(siteContent),
-          ...services.map(s => updateService(s)),
-          ...projects.map(p => saveProject(p)),
-          ...testimonials.map(t => saveTestimonial(t)),
-          ...clients.map(c => saveClient(c)),
-        ]);
-      }
-      // Always save to localStorage as backup
-      ls.set("siteContent", siteContent);
-      ls.set("services", services);
-      ls.set("projects", projects);
-      ls.set("testimonials", testimonials);
-      ls.set("clients", clients);
-      showStatus("saved");
-    } catch (err) {
-      console.error("Save error:", err);
-      // Still save to localStorage
-      ls.set("siteContent", siteContent);
-      ls.set("services", services);
-      ls.set("projects", projects);
-      ls.set("testimonials", testimonials);
-      ls.set("clients", clients);
-      showStatus("saved"); // localStorage succeeded
-    } finally {
-      setSaving(false);
-    }
-  }, [siteContent, services, projects, testimonials, clients, firebaseReady]);
 
   // ── Projects ─────────────────────────────────────────────────────────────
   const addProject = useCallback(async (project: Omit<Project, "order" | "featured">) => {
@@ -320,6 +333,25 @@ export function useAdminData() {
     if (firebaseReady) fbDeleteTestimonial(id).catch(() => {});
   }, [testimonials, firebaseReady]);
 
+  // ── Image Upload ─────────────────────────────────────────────────────────
+  const uploadProjectImage = useCallback(async (file: File) => {
+    if (!firebaseReady) {
+      alert("Firebase is not connected. Cannot upload images.");
+      return null;
+    }
+    const result = await uploadImage(file, "projects");
+    return result.success ? result.url : null;
+  }, [firebaseReady]);
+
+  const uploadTestimonialImage = useCallback(async (file: File) => {
+    if (!firebaseReady) {
+      alert("Firebase is not connected. Cannot upload images.");
+      return null;
+    }
+    const result = await uploadImage(file, "testimonials");
+    return result.success ? result.url : null;
+  }, [firebaseReady]);
+
   // ── Clients ──────────────────────────────────────────────────────────────
   const addClient = useCallback(async (client: Client) => {
     const updated = [...clients, client];
@@ -364,15 +396,17 @@ export function useAdminData() {
     projects, setProjects: setProjectsState,
     testimonials, setTestimonials: setTestimonialsState,
     clients, leads,
+    blogs, setBlogs: setBlogsState,
     // Status
-    saving, saveStatus, firebaseReady,
+    saveStatus, firebaseReady,
     // Actions
-    saveAll,
     addProject, removeProject,
     addService, removeService,
     addTestimonial, removeTestimonial,
     addClient, removeClient, updateProgress,
     updateLeadStatus,
+    uploadProjectImage,
+    uploadTestimonialImage,
   };
 }
 
@@ -380,6 +414,52 @@ export function useAdminData() {
 // CONTACT FORM SUBMISSION
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Web3Forms access key – delivers form submissions directly to
+ * ambassadorcre8tive@gmail.com (no backend or SMTP server needed).
+ */
+const WEB3FORMS_ACCESS_KEY = "6033084c-6aea-473f-ab5f-d5c31da00005";
+const RECIPIENT_EMAIL = "ambassadorcre8tive@gmail.com";
+
+/**
+ * Send the lead via Web3Forms → email delivery
+ */
+async function sendToEmail(data: {
+  name: string;
+  email: string;
+  phone?: string;
+  business?: string;
+  details: string;
+}) {
+  const formData = new FormData();
+  formData.append("access_key", WEB3FORMS_ACCESS_KEY);
+  formData.append("subject", `🌟 New Lead from ${data.name} – Ambassador Cre8tive`);
+  formData.append("from_name", "Ambassador Cre8tive Website");
+  formData.append("to", RECIPIENT_EMAIL);
+  formData.append("replyto", data.email);
+  formData.append("name", data.name);
+  formData.append("email", data.email);
+  formData.append("phone", data.phone || "Not provided");
+  formData.append("business", data.business || "Not provided");
+  formData.append("message", data.details);
+  formData.append("botcheck", ""); // honey-pot spam protection
+
+  const response = await fetch("https://api.web3forms.com/submit", {
+    method: "POST",
+    body: formData,
+  });
+  return response.ok;
+}
+
+/**
+ * Submit the contact form
+ *   1. Send to email via Web3Forms (always)
+ *   2. Save to Firestore as a Lead (always, when Firebase reachable)
+ *   3. Open a pre-filled WhatsApp chat (always)
+ *
+ * Each delivery channel runs independently so one failure does not block the
+ * others. Returns immediately so the UI feels instant.
+ */
 export async function submitContactForm(data: {
   name: string;
   email: string;
@@ -387,13 +467,13 @@ export async function submitContactForm(data: {
   business?: string;
   details: string;
 }) {
-  // 1. Always open WhatsApp
-  const msg = `Hello Ambassador Cre8tive!%0A%0AName: ${data.name}%0ABusiness: ${data.business}%0AEmail: ${data.email}%0APhone: ${data.phone}%0AProject: ${data.details}`;
-  window.open(`https://wa.me/2349030192034?text=${msg}`, "_blank");
+  // Fire all three channels in parallel
+  const channels = await Promise.allSettled([
+    // 1️⃣  Email via Web3Forms
+    sendToEmail(data),
 
-  // 2. Also save to Firebase as a lead
-  try {
-    await saveLead({
+    // 2️⃣  Firestore lead record
+    saveLead({
       name: data.name,
       email: data.email,
       phone: data.phone,
@@ -401,11 +481,19 @@ export async function submitContactForm(data: {
       message: data.details,
       source: "contact_form",
       status: "new",
-    });
-    return { success: true };
-  } catch (err) {
-    // WhatsApp still opened, so not a critical failure
-    console.warn("Lead not saved to Firebase:", err);
-    return { success: true };
-  }
+    }),
+  ]);
+
+  // 3️⃣  Open WhatsApp (always last so it doesn't block the email POST)
+  const msg = `Hello Ambassador Cre8tive!%0A%0AName: ${data.name}%0ABusiness: ${data.business || ""}%0AEmail: ${data.email}%0APhone: ${data.phone || ""}%0AProject: ${data.details}`;
+  window.open(`https://wa.me/2349030192034?text=${msg}`, "_blank");
+
+  const emailOK = channels[0].status === "fulfilled" && channels[0].value === true;
+  const firebaseOK = channels[1].status === "fulfilled";
+
+  return {
+    success: true,
+    emailDelivered: emailOK,
+    leadSaved: firebaseOK,
+  };
 }

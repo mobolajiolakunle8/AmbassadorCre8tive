@@ -38,7 +38,7 @@ function setLink(rel: string, href: string) {
 
 export default function SEOHead({
   title = "Ambassador Cre8tive — Premium Websites That Grow Your Business",
-  description = "Premium web design & development agency in Lagos, Nigeria. We build modern, fast, and conversion-focused websites for ambitious businesses ready to stand out online.",
+  description = "Premium web design & development agency in Ibadan, Nigeria. We build modern, fast, and conversion-focused websites for ambitious businesses ready to stand out online.",
   canonical,
   ogImage = "/images/hero-mockup.png",
   noindex = false,
@@ -139,8 +139,8 @@ export function OrganizationSchema({
     },
     address: {
       "@type": "PostalAddress",
-      addressLocality: address?.city || "Lagos",
-      addressRegion: address?.region || "Lagos",
+      addressLocality: address?.city || "Ibadan",
+      addressRegion: address?.region || "Oyo",
       addressCountry: address?.country || "NG",
     },
     ...(sameAs.length > 0 && { sameAs }),
@@ -191,7 +191,7 @@ export function WebSiteSchema({ name = "Ambassador Cre8tive", url }: { name?: st
 export function ServicesSchema({
   services,
   providerName = "Ambassador Cre8tive",
-  areaServed = ["Lagos", "Nigeria", "United Kingdom", "United States"],
+  areaServed = ["Ibadan", "Nigeria", "United Kingdom", "United States"],
 }: {
   services: { title: string; desc: string }[];
   providerName?: string;
@@ -331,14 +331,14 @@ export function LocalBusinessSchema({
     ...(image && { image }),
     address: {
       "@type": "PostalAddress",
-      addressLocality: "Lagos",
-      addressRegion: "Lagos",
+      addressLocality: "Ibadan",
+      addressRegion: "Oyo",
       addressCountry: "NG",
     },
     geo: {
       "@type": "GeoCoordinates",
-      latitude: "6.5244",
-      longitude: "3.3792",
+      latitude: "7.3776",
+      longitude: "3.9470",
     },
     openingHoursSpecification: [
       {

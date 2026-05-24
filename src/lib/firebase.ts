@@ -1,27 +1,21 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  getDocs, 
-  query, 
+import {
+  getFirestore,
+  collection,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  getDocs,
+  query,
   where,
   onSnapshot,
   serverTimestamp,
-  Timestamp
+  Timestamp,
 } from "firebase/firestore";
-import { 
-  getAuth, 
-  signInWithEmailAndPassword, 
-  signOut, 
-  onAuthStateChanged,
-  type User
-} from "firebase/auth";
+import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 /**
@@ -48,13 +42,12 @@ export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 
-// Initialize Analytics (only in browser, not SSR)
-export const analytics = typeof window !== "undefined" ? (async () => {
-  if (await isSupported()) {
-    return getAnalytics(app);
-  }
-  return null;
-})() : null;
+// Initialize Analytics (only in browser, never on SSR)
+if (typeof window !== "undefined") {
+  isSupported().then((ok) => {
+    if (ok) getAnalytics(app);
+  });
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -74,7 +67,18 @@ export interface SiteContent {
   contact: {
     email: string;
     phone: string;
+    location: string;
   };
+  social: {
+    instagram: string;
+    twitter: string;
+    linkedin: string;
+    facebook: string;
+    tiktok: string;
+  };
+  logo: string;
+  name: string;
+  tagline: string;
   updatedAt?: Timestamp;
 }
 
@@ -147,9 +151,7 @@ export interface Lead {
 export async function adminLogin(email: string, password: string) {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    // Store admin flag
     localStorage.setItem("adminLoggedIn", "true");
-    localStorage.setItem("adminUid", userCredential.user.uid);
     return { success: true, user: userCredential.user };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -180,43 +182,19 @@ export async function clientLogin(email: string, password: string) {
       return { success: true, client: clientData };
     }
     
-    // Fallback demo
-    if (email === "client@demo.com" && password === "client123") {
-      const demoClient = {
-        id: "demo",
-        name: "Demo Client",
-        email: "client@demo.com",
-        business: "Demo Business",
-        projectName: "Premium Business Website",
-        projectType: "Business Website",
-        status: "development" as const,
-        progress: 65,
-        startDate: "2026-01-15",
-        estimatedLaunch: "2026-02-15",
-        managerName: "Alex Morgan",
-        managerEmail: "alex@ambassadorcre8tive.com",
-      };
+    // Check localStorage fallback
+    const localClients = JSON.parse(localStorage.getItem("clients") || "[]");
+    const localClient = localClients.find((c: any) => c.email === email && c.password === password);
+    if (localClient) {
       localStorage.setItem("clientLoggedIn", "true");
-      localStorage.setItem("clientData", JSON.stringify(demoClient));
-      return { success: true, client: demoClient };
+      localStorage.setItem("clientData", JSON.stringify(localClient));
+      return { success: true, client: localClient };
     }
-    
-    return { success: false, error: "Invalid credentials" };
+
+    return { success: false, error: "Invalid credentials. Contact your project manager." };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
-}
-
-export async function logout() {
-  await signOut(auth);
-  localStorage.removeItem("adminLoggedIn");
-  localStorage.removeItem("adminUid");
-  localStorage.removeItem("clientLoggedIn");
-  localStorage.removeItem("clientData");
-}
-
-export function onAuthChange(callback: (user: User | null) => void) {
-  return onAuthStateChanged(auth, callback);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -468,16 +446,66 @@ export async function updateLeadStatus(leadId: string, status: Lead["status"]) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FILE UPLOADS
+// IMAGE UPLOAD (Firebase Storage)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function uploadFile(file: File, path: string) {
+/**
+ * Client-side image compression using Canvas
+ */
+async function compressImage(file: File, maxWidth = 1200, quality = 0.7): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = (maxWidth / width) * height;
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error("Canvas toBlob failed"));
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+    };
+    reader.onerror = (error) => reject(error);
+  });
+}
+
+/**
+ * Uploads an image file to Firebase Storage and returns a public download URL.
+ * Includes automatic client-side compression.
+ */
+export async function uploadImage(file: File, folder: string = "uploads") {
   try {
-    const storageRef = ref(storage, path);
-    const snapshot = await uploadBytes(storageRef, file);
-    const url = await getDownloadURL(snapshot.ref);
-    return { success: true, url };
+    // Auto-compress before upload
+    const compressedBlob = await compressImage(file);
+    
+    const fileName = `${Date.now()}-${file.name.replace(/\.[^/.]+$/, "").replace(/\s+/g, "-")}.jpg`;
+    const storageRef = ref(storage, `${folder}/${fileName}`);
+    
+    await uploadBytes(storageRef, compressedBlob);
+    const downloadURL = await getDownloadURL(storageRef);
+    
+    return { success: true, url: downloadURL };
   } catch (error: any) {
+    console.error("Image upload failed:", error);
     return { success: false, error: error.message };
   }
 }
@@ -506,10 +534,21 @@ export async function seedInitialData() {
         title: "Why Businesses Choose Ambassador Cre8tive",
         content: "We help businesses establish a strong online presence with premium website design, modern user experience, mobile responsiveness, SEO optimization, and conversion-focused layouts.",
       },
-      contact: {
+        contact: {
         email: "ambassadorcre8tive@gmail.com",
         phone: "+2349030192034",
+        location: "Ibadan, Nigeria",
       },
+      social: {
+        instagram: "",
+        twitter: "",
+        linkedin: "",
+        facebook: "",
+        tiktok: "",
+      },
+      logo: "/logo.png",
+      name: "Ambassador Cre8tive",
+      tagline: "Premium Web Agency",
       updatedAt: serverTimestamp(),
     });
 

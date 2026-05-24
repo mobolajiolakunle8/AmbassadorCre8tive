@@ -13,6 +13,7 @@ import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import ClientLogin from "./pages/ClientLogin";
 import ClientDashboard from "./pages/ClientDashboard";
+import BlogPage from "./pages/BlogPage";
 import OptimizedImage from "./components/OptimizedImage";
 import { ThemeProvider, ThemeToggle, ThemeStyles, useTheme } from "./components/ThemeProvider";
 import { useSiteData, submitContactForm } from "./lib/useFirebase";
@@ -232,7 +233,10 @@ function MainSite() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormSent(true);
-    /* Saves to Firebase as a lead AND opens WhatsApp */
+    /*
+     * Triple-delivery: Email (Web3Forms) + Firebase lead + WhatsApp.
+     * Each channel is independent so failure in one won't block the others.
+     */
     await submitContactForm({
       name: formData.name,
       email: formData.email,
@@ -240,7 +244,10 @@ function MainSite() {
       business: formData.business,
       details: formData.details,
     });
-    setTimeout(() => { setFormSent(false); setFormData({ name: "", business: "", email: "", phone: "", details: "" }); }, 4000);
+    setTimeout(() => {
+      setFormSent(false);
+      setFormData({ name: "", business: "", email: "", phone: "", details: "" });
+    }, 4000);
   };
 
   return (
@@ -275,7 +282,7 @@ function MainSite() {
       {/* ── SEO & STRUCTURED DATA ── */}
       <SEOHead
         title="Ambassador Cre8tive — Premium Websites That Grow Your Business"
-        description={`${siteContent.hero.subheadline} Custom web design, e-commerce, landing pages, and website redesign by a premium agency in Lagos, Nigeria. Contact us: ${siteContent.contact.email}`}
+        description={`${siteContent.hero.subheadline} Custom web design, e-commerce, landing pages, and website redesign by a premium agency in ${siteContent.contact.location || "Ibadan, Nigeria"}. Contact us: ${siteContent.contact.email}`}
       />
       <OrganizationSchema
         email={siteContent.contact.email}
@@ -376,24 +383,27 @@ function MainSite() {
                 transition={{ duration: 0.4 }}
                 className="relative h-10 w-10 overflow-hidden rounded-xl bg-gradient-to-br from-[#5E0B1D] to-[#7A1128] shadow-lg shadow-[#5E0B1D]/20 grid place-items-center"
               >
-                <span className="text-[24px] font-bold text-[#F7F1ED]" style={{ fontFamily: "Poppins" }}>A</span>
+                <img src={siteContent.logo} alt="Logo" className="h-full w-full object-cover" />
               </motion.div>
               <div>
                 <div className="text-[15px] font-semibold tracking-tight leading-none" style={{ fontFamily: "Montserrat, Poppins" }}>
-                  Ambassador <span className="text-[#5E0B1D]">Cre8tive</span>
+                  {siteContent.name.split(" ").length > 1 
+                    ? <>{siteContent.name.split(" ")[0]} <span className="text-[#5E0B1D]">{siteContent.name.split(" ").slice(1).join(" ")}</span></>
+                    : siteContent.name
+                  }
                 </div>
-                <div className="text-[10px] uppercase tracking-[0.18em] text-[#5E0B1D]/60 font-medium">Premium Web Agency</div>
+                <div className="text-[10px] uppercase tracking-[0.18em] text-[#5E0B1D]/60 font-medium">{siteContent.tagline}</div>
               </div>
             </motion.div>
 
             <nav className="hidden items-center gap-1 md:flex" aria-label="Main navigation">
-              {["Services", "Work", "Process", "About"].map((item, i) => (
+              {["Services", "Work", "Process", "About", "Blog"].map((item, i) => (
                 <motion.button
                   key={item}
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 + i * 0.05, duration: 0.4 }}
-                  onClick={() => scrollTo(item.toLowerCase())}
+                  onClick={() => item === "Blog" ? (window.location.hash = "#/blog") : scrollTo(item.toLowerCase())}
                   whileHover={{ color: "var(--brand)" }}
                   className="rounded-full px-4 py-2 text-[14px] font-medium transition hover:bg-[var(--brand-bg)]"
                   style={{ color: "var(--nav-link)" }}
@@ -1070,7 +1080,7 @@ function MainSite() {
                 <div className="mt-10">
                   <div className="text-[13px] font-medium text-white/80">Trusted by businesses across Nigeria & beyond</div>
                   <div className="mt-3 flex flex-wrap items-center gap-4 opacity-80">
-                    {["Lagos", "Abuja", "Port Harcourt", "UK", "US"].map((c, i) => (
+                    {["Ibadan", "Lagos", "Abuja", "UK", "US"].map((c, i) => (
                       <motion.span key={c} initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ delay: i * 0.1 }} viewport={{ once: true }} className="text-[12px]">{c}</motion.span>
                     ))}
                   </div>
@@ -1129,13 +1139,38 @@ function MainSite() {
                 <div className="flex flex-wrap items-center gap-3">
                   <MagneticBtn type="submit" className="group relative overflow-hidden rounded-full bg-[#5E0B1D] px-7 py-3.5 text-[15px] font-semibold text-white shadow-xl shadow-[#5E0B1D]/20">
                     <span className="relative z-10 flex items-center gap-2">
-                      {formSent ? "Opening WhatsApp..." : "Send via WhatsApp"}
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" /></svg>
+                      <AnimatePresence mode="wait">
+                        {formSent ? (
+                          <motion.span
+                            key="sent"
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -8 }}
+                            className="flex items-center gap-2"
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            Message Sent!
+                          </motion.span>
+                        ) : (
+                          <motion.span
+                            key="send"
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -8 }}
+                            className="flex items-center gap-2"
+                          >
+                            Send Message
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
                     </span>
                     <motion.div initial={{ y: "100%" }} whileHover={{ y: "0%" }} transition={{ duration: 0.3 }}
                       className="absolute inset-0 bg-gradient-to-r from-[#7A1128] to-[#5E0B1D]" />
                   </MagneticBtn>
-                  <div className="text-[13px] text-[#3d2228]/70">We reply within 2 hours • No spam</div>
+                  <div className="text-[13px] text-[#3d2228]/70">
+                    📧 Delivered to email · 💾 Saved to CRM · 💬 Opens WhatsApp · Reply within 2 hours
+                  </div>
                 </div>
               </form>
             </div>
@@ -1163,7 +1198,10 @@ function MainSite() {
             </motion.div>
 
             {[
-              { title: "Quick Links", items: ["Services", "Work", "Process", "About", "Contact"].map((l) => ({ label: l, onClick: () => scrollTo(l.toLowerCase()) })) },
+              { title: "Quick Links", items: [
+                ...["Services", "Work", "Process", "About", "Contact"].map((l) => ({ label: l, onClick: () => scrollTo(l.toLowerCase()) })),
+                { label: "Blog", onClick: () => { window.location.hash = "#/blog"; } },
+              ] },
             ].map((col) => (
               <motion.div key={col.title} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }} viewport={{ once: true }}>
                 <div className="text-[13px] font-semibold uppercase tracking-wide text-[#2a1216]/70">{col.title}</div>
@@ -1180,7 +1218,7 @@ function MainSite() {
               <div className="mt-3 grid gap-2 text-[14px] text-[#3d2228]/80">
                 <motion.a whileHover={{ x: 3, color: "#5E0B1D" }} href={`mailto:${siteContent.contact.email}`} className="transition">{siteContent.contact.email}</motion.a>
                 <motion.a whileHover={{ x: 3, color: "#5E0B1D" }} href={`https://wa.me/${siteContent.contact.phone.replace(/\D/g,"")}`} target="_blank" className="transition">{siteContent.contact.phone}</motion.a>
-                <div>Lagos, Nigeria</div>
+                <div>{siteContent.contact.location || "Ibadan, Nigeria"}</div>
               </div>
             </motion.div>
 
@@ -1188,11 +1226,13 @@ function MainSite() {
               <div className="text-[13px] font-semibold uppercase tracking-wide text-[#2a1216]/70">Follow</div>
               <div className="mt-3 flex items-center gap-3">
                 {[
-                  { name: "Instagram", icon: "M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z M17.5 6.5h.01 M7.5 2h9a5.5 5.5 0 015.5 5.5v9a5.5 5.5 0 01-5.5 5.5h-9A5.5 5.5 0 012 16.5v-9A5.5 5.5 0 017.5 2z" },
-                  { name: "Twitter/X", icon: "M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z" },
-                  { name: "LinkedIn", icon: "M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6z M2 9h4v12H2z M4 6a2 2 0 100-4 2 2 0 000 4z" },
-                ].map((s, i) => (
-                  <motion.a key={s.name} href="#" aria-label={s.name}
+                  { name: "Instagram", icon: "M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z M17.5 6.5h.01 M7.5 2h9a5.5 5.5 0 015.5 5.5v9a5.5 5.5 0 01-5.5 5.5h-9A5.5 5.5 0 012 16.5v-9A5.5 5.5 0 017.5 2z", url: siteContent.social?.instagram },
+                  { name: "Twitter/X", icon: "M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z", url: siteContent.social?.twitter },
+                  { name: "LinkedIn", icon: "M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6z M2 9h4v12H2z M4 6a2 2 0 100-4 2 2 0 000 4z", url: siteContent.social?.linkedin },
+                  { name: "Facebook", icon: "M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z", url: siteContent.social?.facebook },
+                  { name: "TikTok", icon: "M9 12a4 4 0 104 4V4a5 5 0 005 5", url: siteContent.social?.tiktok },
+                ].filter(s => s.url).map((s, i) => (
+                  <motion.a key={s.name} href={s.url || "#"} target="_blank" rel="noopener noreferrer" aria-label={s.name}
                     initial={{ opacity: 0, scale: 0.7 }} whileInView={{ opacity: 1, scale: 1 }} transition={{ delay: 0.4 + i * 0.1 }} viewport={{ once: true }}
                     whileHover={{ y: -3, backgroundColor: "#5E0B1D", color: "white" }}
                     className="grid h-9 w-9 place-items-center rounded-xl border border-[#5E0B1D]/10 bg-white text-[#5E0B1D] transition-colors"
@@ -1235,7 +1275,7 @@ function MainSite() {
         transition={{ delay: 2, type: "spring", stiffness: 200 }}
         whileHover={{ scale: 1.12 }}
         whileTap={{ scale: 0.92 }}
-        className="group fixed bottom-5 right-5 z-40 grid h-14 w-14 place-items-center rounded-full bg-[#25D366] text-white shadow-2xl shadow-[#25D366]/30 sm:bottom-6 sm:right-6"
+        className="group fixed bottom-5 right-5 z-40 hidden sm:grid h-14 w-14 place-items-center rounded-full bg-[#25D366] text-white shadow-2xl shadow-[#25D366]/30 sm:bottom-6 sm:right-6"
       >
         <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M20.52 3.48A11.86 11.86 0 0012.02 0 11.93 11.93 0 001.5 17.94L0 24l6.2-1.62a11.93 11.93 0 005.82 1.48h.01A11.93 11.93 0 0020.52 3.48zM12.03 21.5a9.48 9.48 0 01-4.83-1.32l-.35-.2-3.68.96.98-3.59-.23-.37a9.5 9.5 0 1116.6-3.02 9.5 9.5 0 01-8.49 7.54zm5.22-7.14c-.29-.15-1.7-.84-1.96-.94s-.45-.15-.64.15-.74.94-.9 1.13-.33.22-.61.07a7.7 7.7 0 01-2.27-1.4 8.5 8.5 0 01-1.57-1.95c-.16-.29 0-.45.12-.6s.29-.33.44-.5.2-.29.3-.48a.5.5 0 00-.02-.48c-.07-.15-.64-1.54-.88-2.11s-.47-.49-.64-.5h-.55a1.06 1.06 0 00-.77.36 3.24 3.24 0 00-1 2.41 5.63 5.63 0 001.18 3 11.4 11.4 0 004.4 3.89 15.4 15.4 0 001.53.57 3.7 3.7 0 001.7.11 2.77 2.77 0 001.82-1.28 2.25 2.25 0 00.16-1.28c-.07-.13-.26-.2-.55-.35z" /></svg>
         <motion.span
@@ -1248,12 +1288,16 @@ function MainSite() {
       {/* ── MOBILE STICKY CTA ── */}
       <motion.div
         initial={{ y: 80 }} animate={{ y: 0 }} transition={{ delay: 1.5, type: "spring", stiffness: 180 }}
-        className="fixed inset-x-0 bottom-0 z-30 border-t p-3 backdrop-blur sm:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t p-4 backdrop-blur sm:hidden"
         style={{ borderColor: "var(--border)", backgroundColor: isDark ? "rgba(12,9,16,0.92)" : "rgba(255,255,255,0.9)" }}
       >
-        <div className="flex gap-2">
-          <motion.a whileTap={{ scale: 0.96 }} href="https://wa.me/2349030192034" target="_blank" className="flex-1 rounded-full bg-[#25D366] px-4 py-3 text-center text-[14px] font-semibold text-white">WhatsApp</motion.a>
-          <MagneticBtn onClick={() => scrollTo("contact")} className="flex-1 rounded-full bg-[#5E0B1D] px-4 py-3 text-[14px] font-semibold text-white">Book Call</MagneticBtn>
+        <div className="flex justify-center">
+          <MagneticBtn 
+            onClick={() => scrollTo("contact")} 
+            className="w-full max-w-[320px] rounded-full bg-[#5E0B1D] py-3.5 text-[15px] font-semibold text-white shadow-lg shadow-[#5E0B1D]/20"
+          >
+            Book a Free Consultation
+          </MagneticBtn>
         </div>
       </motion.div>
 
@@ -1309,9 +1353,10 @@ export default function App() {
     <ThemeProvider>
       <Router>
         <Routes>
-          <Route path="/admin" element={isLoggedIn ? <AdminDashboard /> : <AdminLogin onLogin={() => setIsLoggedIn(true)} />} />
-          <Route path="/client" element={isClientLoggedIn ? <ClientDashboard /> : <ClientLogin onLogin={() => setIsClientLoggedIn(true)} />} />
-          <Route path="/" element={<MainSite />} />
+        <Route path="/admin" element={isLoggedIn ? <AdminDashboard /> : <AdminLogin onLogin={() => setIsLoggedIn(true)} />} />
+        <Route path="/client" element={isClientLoggedIn ? <ClientDashboard /> : <ClientLogin onLogin={() => setIsClientLoggedIn(true)} />} />
+        <Route path="/blog" element={<BlogPage />} />
+        <Route path="/" element={<MainSite />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>

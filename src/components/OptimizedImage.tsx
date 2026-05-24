@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, type ImgHTMLAttributes } from "react";
 import { motion } from "framer-motion";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * OptimizedImage
  * — Auto-converts Pexels / Unsplash URLs to WebP & AVIF
@@ -219,20 +221,4 @@ export default function OptimizedImage({
   );
 }
 
-/**
- * Convenience hook to preload a critical image before render
- * (use for the hero image to land instantly when visible)
- */
-export function usePreloadImage(src: string) {
-  useEffect(() => {
-    if (!src) return;
-    const link = document.createElement("link");
-    link.rel = "preload";
-    link.as = "image";
-    link.href = src;
-    document.head.appendChild(link);
-    return () => {
-      document.head.removeChild(link);
-    };
-  }, [src]);
-}
+

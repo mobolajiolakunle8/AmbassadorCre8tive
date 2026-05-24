@@ -54,47 +54,12 @@ export default function ClientDashboard() {
     const client = JSON.parse(localStorage.getItem("clientData") || "{}");
     setClientData(client);
 
-    // Load project data - either from admin-created projects or demo
+    // Load project data from admin-created projects
     const projects = JSON.parse(localStorage.getItem("clientProjects") || "[]");
     const clientProject = projects.find((p: any) => p.clientId === client.id);
     
     if (clientProject) {
       setProject(clientProject);
-    } else {
-      // Demo project data
-      setProject({
-        id: "demo-project",
-        name: "Premium Business Website",
-        businessName: client.business || "Demo Business",
-        type: "Business Website",
-        status: "development",
-        startDate: "2026-01-15",
-        estimatedLaunch: "2026-02-15",
-        progress: 65,
-        manager: {
-          name: "Alex Morgan",
-          email: "alex@ambassadorcre8tive.com",
-          phone: "+2349030192034"
-        },
-        milestones: [
-          { id: "1", title: "Project Kickoff", description: "Initial consultation and requirements gathering", status: "completed", date: "2026-01-15", completedDate: "2026-01-15" },
-          { id: "2", title: "Design Phase", description: "Wireframes, mockups, and design approval", status: "completed", date: "2026-01-25", completedDate: "2026-01-24" },
-          { id: "3", title: "Development", description: "Frontend and backend development", status: "in-progress", date: "2026-02-05" },
-          { id: "4", title: "Content Integration", description: "Adding your content and images", status: "pending", date: "2026-02-10" },
-          { id: "5", title: "Testing & QA", description: "Cross-browser testing and bug fixes", status: "pending", date: "2026-02-12" },
-          { id: "6", title: "Launch", description: "Website goes live!", status: "pending", date: "2026-02-15" },
-        ],
-        files: [
-          { id: "1", name: "Project Brief.pdf", type: "pdf", url: "#", uploadedAt: "2026-01-15" },
-          { id: "2", name: "Design Mockups", type: "link", url: "#", uploadedAt: "2026-01-24" },
-          { id: "3", name: "Content Guidelines.pdf", type: "pdf", url: "#", uploadedAt: "2026-01-20" },
-        ],
-        updates: [
-          { id: "1", message: "Development is 70% complete. Homepage and About page are now fully responsive.", date: "2026-02-01", type: "milestone" },
-          { id: "2", message: "Design mockups approved! Moving to development phase.", date: "2026-01-24", type: "milestone" },
-          { id: "3", message: "Welcome to your project portal! I'll be updating you here throughout the build.", date: "2026-01-15", type: "message" },
-        ]
-      });
     }
     setLoading(false);
   }, []);
@@ -506,7 +471,7 @@ export default function ClientDashboard() {
                 <div className="space-y-2 text-sm">
                   <p className="flex items-center gap-2 text-white/70">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                    Lagos, Nigeria
+                    Ibadan, Nigeria
                   </p>
                   <p className="flex items-center gap-2 text-white/70">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>

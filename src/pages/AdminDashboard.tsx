@@ -1,11 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAdminData } from "../lib/useFirebase";
 import type { Client } from "../lib/firebase";
-
-interface BlogPost {
-  id: string; title: string; excerpt: string;
-  content: string; image: string; date: string; published: boolean;
-}
+import LogoUploader from "../components/LogoUploader";
 
 const ICON = {
   trash: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16",
@@ -16,6 +12,16 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [showPreview, setShowPreview] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 1024);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024) setSidebarOpen(false);
+      else setSidebarOpen(true);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
   const [newProject, setNewProject] = useState({ title: "", url: "", tag: "", image: "" });
   const [generatingMockup, setGeneratingMockup] = useState(false);
   const [showClientForm, setShowClientForm] = useState(false);
@@ -26,11 +32,6 @@ export default function AdminDashboard() {
     managerEmail: "alex@ambassadorcre8tive.com",
   });
 
-  const [blogs, setBlogs] = useState<BlogPost[]>([
-    { id: "1", title: "5 Web Design Trends That Will Dominate 2026", excerpt: "Discover the latest design trends shaping the future of web development.", content: "", image: "https://images.pexels.com/photos/1181449/pexels-photo-1181449.jpeg?auto=compress&cs=tinysrgb&w=800", date: "2026-01-15", published: true },
-    { id: "2", title: "Why Your Business Needs a Premium Website", excerpt: "Learn how premium web design can transform your business.", content: "", image: "https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&cs=tinysrgb&w=800", date: "2026-01-10", published: true },
-  ]);
-
   /* ── Firebase-backed data hook ─────────────────────────────────────────── */
   const {
     siteContent, setSiteContent,
@@ -39,13 +40,15 @@ export default function AdminDashboard() {
     testimonials, setTestimonials,
     clients,
     leads,
-    saving, saveStatus, firebaseReady,
-    saveAll,
+    blogs, setBlogs,
+    saveStatus, firebaseReady,
     addProject: fbAddProject, removeProject,
     addService: fbAddService, removeService,
     addTestimonial: fbAddTestimonial, removeTestimonial,
     addClient: fbAddClient, removeClient, updateProgress,
     updateLeadStatus,
+    uploadProjectImage,
+    uploadTestimonialImage,
   } = useAdminData();
 
   const handleLogout = () => {
@@ -142,17 +145,24 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#F5F3F1]">
+    <div className="min-h-screen bg-[#F5F3F1] flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-white border-b border-gray-200">
-        <div className="flex items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-4">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[#5E0B1D] to-[#7A1128] grid place-items-center">
+      <header className="sticky top-0 z-50 bg-white border-b border-gray-200 flex-shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <button 
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"
+              title={sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[#5E0B1D] to-[#7A1128] grid place-items-center flex-shrink-0">
               <span className="text-xl font-bold text-white">A</span>
             </div>
-            <div>
+            <div className="hidden xs:block">
               <div className="flex items-center gap-2">
-                <h1 className="text-lg font-semibold text-gray-900">Admin Dashboard</h1>
+                <h1 className="text-base sm:text-lg font-semibold text-gray-900 leading-tight">Admin Dashboard</h1>
                 {firebaseReady
                   ? <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-medium">🔥 Firebase</span>
                   : <span className="px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 text-xs font-medium">💾 Local</span>
@@ -163,48 +173,69 @@ export default function AdminDashboard() {
           </div>
           <div className="flex items-center gap-3">
             <button onClick={() => window.open("/", "_blank")} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900">View Site</button>
-            <button
-              onClick={saveAll}
-              disabled={saving}
-              className={`px-4 py-2 text-sm font-semibold text-white rounded-full transition ${
-                saveStatus === "saved" ? "bg-green-600" :
-                saveStatus === "error" ? "bg-red-600" :
-                "bg-[#5E0B1D] hover:bg-[#4a0917]"
-              } disabled:opacity-60`}
-            >
-              {saving ? "Saving..." : saveStatus === "saved" ? "✅ Saved!" : saveStatus === "error" ? "❌ Error" : "Save All Changes"}
-            </button>
+            
+            {/* Auto-Save Status Indicator */}
+            <div className={`px-4 py-2 text-sm font-semibold rounded-full transition flex items-center gap-2 ${
+              saveStatus === "saved" ? "bg-green-100 text-green-700" :
+              saveStatus === "saving" ? "bg-blue-100 text-blue-700" :
+              saveStatus === "error" ? "bg-red-100 text-red-700" :
+              "bg-gray-100 text-gray-600"
+            }`}>
+              {saveStatus === "saving" && <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />}
+              {saveStatus === "saved" && <span>✅ Saved</span>}
+              {saveStatus === "error" && <span>❌ Error</span>}
+              {saveStatus === "idle" && <span>● Auto-saving enabled</span>}
+            </div>
+
             <button onClick={handleLogout} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-red-600">Logout</button>
           </div>
         </div>
       </header>
 
-      <div className="flex">
+      <div className="flex flex-1 overflow-hidden relative">
         {/* Sidebar */}
-        <aside className="w-64 bg-white border-r border-gray-200 min-h-[calc(100vh-73px)] p-4">
-          <nav className="space-y-1">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition ${
-                  activeTab === tab.id ? "bg-[#5E0B1D]/10 text-[#5E0B1D]" : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d={tab.icon} />
-                </svg>
-                {tab.label}
-                {tab.id === "leads" && leads.filter(l => l.status === "new").length > 0 && (
-                  <span className="ml-auto bg-[#5E0B1D] text-white text-xs rounded-full px-1.5 py-0.5">{leads.filter(l => l.status === "new").length}</span>
-                )}
-              </button>
-            ))}
-          </nav>
+        <aside 
+          className={`
+            fixed lg:relative z-40 h-[calc(100vh-73px)] bg-white border-r border-gray-200 transition-all duration-300 overflow-y-auto
+            ${sidebarOpen ? "w-64 translate-x-0" : "w-0 -translate-x-full lg:w-0 lg:-translate-x-full lg:border-none"}
+          `}
+        >
+          <div className="p-4 w-64">
+            <nav className="space-y-1">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    if (window.innerWidth < 1024) setSidebarOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition-colors ${
+                    activeTab === tab.id ? "bg-[#5E0B1D]/10 text-[#5E0B1D]" : "text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d={tab.icon} />
+                  </svg>
+                  <span>{tab.label}</span>
+                  {tab.id === "leads" && leads.filter(l => l.status === "new").length > 0 && (
+                    <span className="ml-auto bg-[#5E0B1D] text-white text-xs rounded-full px-1.5 py-0.5">{leads.filter(l => l.status === "new").length}</span>
+                  )}
+                </button>
+              ))}
+            </nav>
+          </div>
         </aside>
 
+        {/* Overlay for mobile when sidebar is open */}
+        {sidebarOpen && (
+          <div 
+            className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm lg:hidden mt-[73px]"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         {/* Main Content */}
-        <main className="flex-1 p-8 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-8 themed-scrollbar">
 
           {/* Overview */}
           {activeTab === "overview" && (
@@ -238,8 +269,22 @@ export default function AdminDashboard() {
           {activeTab === "content" && (
             <div className="space-y-6">
               <h2 className="text-2xl font-semibold text-gray-900">Site Content</h2>
+              <LogoUploader onUpdate={(url) => setSiteContent({...siteContent, logo: url})} />
               <div className="bg-white rounded-2xl p-6 border border-gray-200 space-y-6">
                 <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Brand Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Website Name</label>
+                      <input value={siteContent.name} onChange={(e) => setSiteContent({ ...siteContent, name: e.target.value })} className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-[#5E0B1D]" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Tagline</label>
+                      <input value={siteContent.tagline} onChange={(e) => setSiteContent({ ...siteContent, tagline: e.target.value })} className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-[#5E0B1D]" />
+                    </div>
+                  </div>
+                </div>
+                <div className="border-t border-gray-200 pt-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Hero Section</h3>
                   <div className="space-y-4">
                     <div>
@@ -286,6 +331,34 @@ export default function AdminDashboard() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                       <input value={siteContent.contact.phone} onChange={(e) => setSiteContent({ ...siteContent, contact: { ...siteContent.contact, phone: e.target.value } })} className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-[#5E0B1D]" />
                     </div>
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                      <input value={siteContent.contact.location || ""} onChange={(e) => setSiteContent({ ...siteContent, contact: { ...siteContent.contact, location: e.target.value } })} className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-[#5E0B1D]" placeholder="Ibadan, Nigeria" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-200 pt-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Social Media Handles</h3>
+                  <p className="text-xs text-gray-500 mb-4">Paste your full profile URL for each platform. Leave blank to hide.</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    {([
+                      ["Instagram", "instagram", "https://instagram.com/yourhandle"],
+                      ["Twitter / X", "twitter", "https://x.com/yourhandle"],
+                      ["LinkedIn", "linkedin", "https://linkedin.com/company/yourpage"],
+                      ["Facebook", "facebook", "https://facebook.com/yourpage"],
+                      ["TikTok", "tiktok", "https://tiktok.com/@yourhandle"],
+                    ] as const).map(([label, key, placeholder]) => (
+                      <div key={key}>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+                        <input
+                          value={(siteContent.social as any)?.[key] || ""}
+                          onChange={(e) => setSiteContent({ ...siteContent, social: { ...siteContent.social, [key]: e.target.value } })}
+                          className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#5E0B1D]"
+                          placeholder={placeholder}
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -334,16 +407,35 @@ export default function AdminDashboard() {
                       <input value={newProject.tag} onChange={(e) => setNewProject({ ...newProject, tag: e.target.value })} className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-[#5E0B1D]" placeholder="e.g., E-commerce" />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Website URL</label>
-                    <div className="flex gap-2">
-                      <input value={newProject.url} onChange={(e) => setNewProject({ ...newProject, url: e.target.value })} className="flex-1 rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-[#5E0B1D]" placeholder="https://example.com" />
-                      <button onClick={generateMockup} disabled={!newProject.url || generatingMockup} className="px-4 py-3 bg-[#5E0B1D] text-white rounded-xl font-medium hover:bg-[#4a0917] disabled:opacity-50">
-                        {generatingMockup ? "Generating..." : "Generate Mockup"}
-                      </button>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">URL auto-generates a screenshot preview</p>
-                  </div>
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-1">Website URL (optional)</label>
+                     <div className="flex gap-2">
+                       <input value={newProject.url} onChange={(e) => setNewProject({ ...newProject, url: e.target.value })} className="flex-1 rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-[#5E0B1D]" placeholder="https://example.com" />
+                       <button onClick={generateMockup} disabled={!newProject.url || generatingMockup} className="px-4 py-3 bg-[#5E0B1D] text-white rounded-xl font-medium hover:bg-[#4a0917] disabled:opacity-50">
+                         {generatingMockup ? "Generating..." : "Generate Mockup"}
+                       </button>
+                     </div>
+                     <p className="text-xs text-gray-500 mt-1">Or upload a custom image below</p>
+                   </div>
+
+                   {/* Local Image Upload */}
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-1">Upload Cover Image</label>
+                     <p className="text-xs text-gray-400 mb-2">Recommended: 760×570px (4:3 ratio). Auto-compressed.</p>
+                     <input
+                       type="file"
+                       accept="image/*"
+                       onChange={async (e) => {
+                         const file = e.target.files?.[0];
+                         if (!file) return;
+                         const url = await uploadProjectImage(file);
+                         if (url) {
+                           setNewProject({ ...newProject, image: url });
+                         }
+                       }}
+                       className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[#5E0B1D] file:text-white hover:file:bg-[#4a0917]"
+                     />
+                   </div>
                   {newProject.image && (
                     <div className="rounded-xl overflow-hidden border border-gray-200">
                       <img src={newProject.image} alt="Preview" loading="lazy" className="w-full h-48 object-cover" />
@@ -549,7 +641,21 @@ export default function AdminDashboard() {
                           <input value={t.role} onChange={(e) => { const u = [...testimonials]; u[index] = { ...u[index], role: e.target.value }; setTestimonials(u); }} className="text-gray-500 border-b border-gray-200 outline-none focus:border-[#5E0B1D]" />
                         </div>
                         <textarea value={t.quote} onChange={(e) => { const u = [...testimonials]; u[index] = { ...u[index], quote: e.target.value }; setTestimonials(u); }} rows={3} className="w-full text-gray-600 outline-none resize-none" />
-                        <input type="text" placeholder="Photo URL" value={t.img} onChange={(e) => { const u = [...testimonials]; u[index] = { ...u[index], img: e.target.value }; setTestimonials(u); }} className="w-full text-xs text-gray-400 border rounded-lg px-2 py-1 outline-none focus:border-[#5E0B1D]" />
+                        <div>
+                          <p className="text-[10px] text-gray-400 mb-1">Photo: 128×128px (1:1 square). Auto-compressed.</p>
+                          <div className="flex items-center gap-2">
+                            <input type="text" placeholder="Photo URL" value={t.img} onChange={(e) => { const u = [...testimonials]; u[index] = { ...u[index], img: e.target.value }; setTestimonials(u); }} className="flex-1 text-xs text-gray-400 border rounded-lg px-2 py-1 outline-none focus:border-[#5E0B1D]" />
+                            <label className="text-xs px-3 py-1 bg-[#5E0B1D] text-white rounded-lg cursor-pointer hover:bg-[#4a0917]">
+                              Upload
+                            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const url = await uploadTestimonialImage(file);
+                              if (url) { const u = [...testimonials]; u[index] = { ...u[index], img: url }; setTestimonials(u); }
+                            }} />
+                          </label>
+                          </div>
+                        </div>
                       </div>
                       <button onClick={() => removeTestimonial(t.id)} className="text-red-500 hover:text-red-700 p-2">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d={ICON.trash} /></svg>
@@ -564,11 +670,18 @@ export default function AdminDashboard() {
           {/* Blog Posts */}
           {activeTab === "blogs" && (
             <div className="space-y-6">
-              <h2 className="text-2xl font-semibold text-gray-900">Blog Posts</h2>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-semibold text-gray-900">Blog Posts</h2>
+                  <p className="text-sm text-gray-500 mt-1">Published posts appear on /#/blog</p>
+                </div>
+                <button onClick={() => { setBlogs([{ id: Date.now().toString(), title: "New Post Title", excerpt: "Short description here", content: "Write your full article content here.", image: "https://images.pexels.com/photos/1181449/pexels-photo-1181449.jpeg?auto=compress&cs=tinysrgb&w=800", date: new Date().toISOString().split("T")[0], published: false, template: "standard" }, ...blogs]); }} className="px-4 py-2 bg-[#5E0B1D] text-white rounded-full text-sm font-semibold">+ New Post</button>
+              </div>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-sm text-yellow-800 flex items-center gap-2">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                Click "Save All Changes" in the header after editing. Blog data saves locally until Firebase Blog collection is set up.
+              </div>
               <div className="bg-white rounded-2xl p-6 border border-gray-200">
-                <button className="w-full py-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-[#5E0B1D] hover:text-[#5E0B1D] font-medium">
-                  + Create New Blog Post
-                </button>
               </div>
               <div className="grid gap-4">
                 {blogs.map((blog, index) => (
@@ -581,9 +694,34 @@ export default function AdminDashboard() {
                         <input value={blog.title} onChange={(e) => { const u = [...blogs]; u[index].title = e.target.value; setBlogs(u); }} className="text-lg font-semibold text-gray-900 outline-none flex-1" />
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ml-2 flex-shrink-0 ${blog.published ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}`}>{blog.published ? "Published" : "Draft"}</span>
                       </div>
-                      <textarea value={blog.excerpt} onChange={(e) => { const u = [...blogs]; u[index].excerpt = e.target.value; setBlogs(u); }} rows={2} className="w-full text-gray-600 outline-none resize-none" />
-                      <div className="flex items-center gap-4">
+                      <textarea value={blog.excerpt} onChange={(e) => { const u = [...blogs]; u[index].excerpt = e.target.value; setBlogs(u); }} rows={2} className="w-full text-sm text-gray-600 outline-none resize-none border-b border-gray-100 mb-2" placeholder="Short excerpt for the card..." />
+                      <textarea value={blog.content} onChange={(e) => { const u = [...blogs]; u[index].content = e.target.value; setBlogs(u); }} rows={10} className="w-full text-sm text-gray-700 outline-none resize-y border rounded-xl p-3 focus:border-[#5E0B1D]" placeholder="Article content... (Use **text** for bold headers)" />
+                      <div className="mb-2">
+                        <p className="text-[10px] text-gray-400 mb-1">Cover image: 1536×768px (2:1 ratio). Auto-compressed.</p>
+                        <div className="flex items-center gap-2">
+                          <input value={blog.image} onChange={(e) => { const u = [...blogs]; u[index].image = e.target.value; setBlogs(u); }} className="flex-1 text-xs text-gray-500 border rounded-lg px-2 py-1 outline-none focus:border-[#5E0B1D]" placeholder="Cover Image URL" />
+                          <label className="text-xs px-3 py-1 bg-[#5E0B1D] text-white rounded-lg cursor-pointer hover:bg-[#4a0917]">
+                            Upload
+                            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const url = await uploadProjectImage(file);
+                              if (url) { const u = [...blogs]; u[index].image = url; setBlogs(u); }
+                            }} />
+                          </label>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-4">
                         <input type="date" value={blog.date} onChange={(e) => { const u = [...blogs]; u[index].date = e.target.value; setBlogs(u); }} className="text-sm border rounded-lg px-2 py-1" />
+                        <select 
+                          value={blog.template || "standard"} 
+                          onChange={(e) => { const u = [...blogs]; u[index].template = e.target.value as any; setBlogs(u); }}
+                          className="text-xs border rounded-lg px-2 py-1 outline-none"
+                        >
+                          <option value="standard">Standard Template</option>
+                          <option value="modern">Modern Template</option>
+                          <option value="minimal">Minimal Template</option>
+                        </select>
                         <button onClick={() => { const u = [...blogs]; u[index].published = !u[index].published; setBlogs(u); }} className={`text-xs px-3 py-1 rounded-full ${blog.published ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
                           {blog.published ? "Unpublish" : "Publish"}
                         </button>
